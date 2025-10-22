@@ -1,0 +1,40 @@
+# Example Configuration - Copy to config.yaml and customize
+database:
+  host: localhost
+  port: 3306
+  name: magento
+  user: magento_user
+  password: ${DB_PASSWORD}  # Use environment variable or replace with actual password
+  
+monitor:
+  interval: 2m  # How often to check for stuck crons
+  
+  detection:
+    # Global default thresholds
+    max_running_time: 30m       # Alert if job runs longer than this
+    max_pending_count: 20       # Alert if more than this many pending jobs
+    consecutive_errors: 3       # Alert after this many consecutive errors
+    max_missed_count: 5         # Alert if job missed this many times in lookback window
+    lookback_window: 1h         # How far back to query cron_schedule
+    threshold_checks: 2         # Number of consecutive detections before alerting (reduces false positives)
+    
+  # Per-group configuration overrides (optional)
+  cron_groups:
+    - name: index
+      check_interval: 5m        # Optional: Override check frequency for this group
+      max_running_time: 60m     # Index jobs can run longer
+      max_pending_count: 10
+      threshold_checks: 3
+      
+    - name: default
+      check_interval: 10m
+      consecutive_errors: 5     # Default group more tolerant of errors
+      
+    - name: consumers
+      max_running_time: 15m     # Consumers should be fast
+      max_pending_count: 30
+      
+logging:
+  file: /var/log/magento-cron-monitor.log
+  level: info  # debug, info, warn, error
+  format: json # json or text
