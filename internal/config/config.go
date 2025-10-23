@@ -27,9 +27,10 @@ type DatabaseConfig struct {
 
 // MonitorConfig holds monitoring settings
 type MonitorConfig struct {
-	Interval  time.Duration     `mapstructure:"interval"`
-	Detection DetectionConfig   `mapstructure:"detection"`
-	CronGroups []CronGroupConfig `mapstructure:"cron_groups"`
+	Interval     time.Duration        `mapstructure:"interval"`
+	Detection    DetectionConfig      `mapstructure:"detection"`
+	CronGroups   []CronGroupConfig    `mapstructure:"cron_groups"`
+	JobOverrides []JobOverrideConfig  `mapstructure:"job_overrides"`
 }
 
 // DetectionConfig holds global detection thresholds
@@ -50,6 +51,16 @@ type DetectionConfig struct {
 type CronGroupConfig struct {
 	Name               string         `mapstructure:"name"`
 	CheckInterval      *time.Duration `mapstructure:"check_interval"`       // Optional override
+	MaxRunningTime     *time.Duration `mapstructure:"max_running_time"`
+	MaxPendingCount    *int           `mapstructure:"max_pending_count"`
+	ConsecutiveErrors  *int           `mapstructure:"consecutive_errors"`
+	MaxMissedCount     *int           `mapstructure:"max_missed_count"`
+	ThresholdChecks    *int           `mapstructure:"threshold_checks"`
+}
+
+// JobOverrideConfig holds per-job configuration overrides for specific job codes
+type JobOverrideConfig struct {
+	JobCode            string         `mapstructure:"job_code"`
 	MaxRunningTime     *time.Duration `mapstructure:"max_running_time"`
 	MaxPendingCount    *int           `mapstructure:"max_pending_count"`
 	ConsecutiveErrors  *int           `mapstructure:"consecutive_errors"`
@@ -160,13 +171,15 @@ func (c *CronGroupConfig) GetCheckInterval(defaultInterval time.Duration) time.D
 
 // GetDetectionConfig returns the effective detection config for a cron group
 // It merges group-specific overrides with global defaults
-func (c *Config) GetDetectionConfig(groupName string) DetectionConfig {
+// GetDetectionConfig returns the effective detection configuration for a specific job
+// Priority: job_overrides > cron_groups > global defaults
+func (c *Config) GetDetectionConfig(jobCode, groupName string) DetectionConfig {
 	cfg := c.Monitor.Detection // Start with global defaults
 
-	// Find group-specific config
+	// First, apply group-specific config if available
 	for _, group := range c.Monitor.CronGroups {
 		if group.Name == groupName {
-			// Apply overrides
+			// Apply group overrides
 			if group.MaxRunningTime != nil {
 				cfg.MaxRunningTime = *group.MaxRunningTime
 			}
@@ -181,6 +194,29 @@ func (c *Config) GetDetectionConfig(groupName string) DetectionConfig {
 			}
 			if group.ThresholdChecks != nil {
 				cfg.ThresholdChecks = *group.ThresholdChecks
+			}
+			break
+		}
+	}
+
+	// Then, apply job-specific overrides if available (highest priority)
+	for _, job := range c.Monitor.JobOverrides {
+		if job.JobCode == jobCode {
+			// Apply job-specific overrides
+			if job.MaxRunningTime != nil {
+				cfg.MaxRunningTime = *job.MaxRunningTime
+			}
+			if job.MaxPendingCount != nil {
+				cfg.MaxPendingCount = *job.MaxPendingCount
+			}
+			if job.ConsecutiveErrors != nil {
+				cfg.ConsecutiveErrors = *job.ConsecutiveErrors
+			}
+			if job.MaxMissedCount != nil {
+				cfg.MaxMissedCount = *job.MaxMissedCount
+			}
+			if job.ThresholdChecks != nil {
+				cfg.ThresholdChecks = *job.ThresholdChecks
 			}
 			break
 		}

@@ -83,6 +83,12 @@ monitor:
     - name: "consumers"
       max_running_time: 15m
 
+  # Optional: per-job overrides
+  job_overrides:
+    - job_code: "indexer_reindex_all_invalid"
+      max_running_time: 180m
+      threshold_checks: 3
+
 logging:
   file: "./logs/magento-cron-monitor.log"
   level: "info"  # debug, info, warn, error
@@ -111,6 +117,17 @@ logging:
 - `detection.scheduler_inactivity_minutes` - Alert if no jobs created in this timeframe (default: 10)
 - `detection.scheduler_lookahead_minutes` - AND no pending jobs scheduled in next X minutes (default: 15)
 - `cron_groups` - Per-group overrides (auto-detected from job_code patterns)
+- `job_overrides` - Per-job overrides for specific job codes
+
+#### Configuration Priority
+
+The monitor applies thresholds in the following priority order (highest to lowest):
+
+1. **Job-specific overrides** (`job_overrides`) - Exact job_code match
+2. **Cron group overrides** (`cron_groups`) - Pattern-based group matching
+3. **Global defaults** (`detection`) - Base configuration
+
+Example: If `indexer_reindex_all_invalid` has a job override with `max_running_time: 180m`, it will use that instead of the "index" group's `60m` or the global default `30m`.
 
 #### Logging Settings
 

@@ -38,6 +38,25 @@ monitor:
       max_running_time: 15m     # Consumers should be fast
       max_pending_count: 30
       
+  # Per-job configuration overrides (optional, highest priority)
+  # Use this to set specific thresholds for individual problematic jobs
+  job_overrides:
+    # Example: Allow a specific reindex job to run much longer
+    - job_code: indexer_reindex_all_invalid
+      max_running_time: 180m    # 3 hours
+      threshold_checks: 3
+      
+    # Example: Tolerate more errors for a flaky job
+    - job_code: catalog_product_alert
+      consecutive_errors: 10
+      max_pending_count: 50
+      
+    # Example: Monitor a critical job more strictly
+    # - job_code: ddg_automation_importer
+    #   max_running_time: 30m
+    #   consecutive_errors: 2
+    #   threshold_checks: 1
+      
 logging:
   file: /var/log/magento-cron-monitor.log
   level: info  # debug, info, warn, error

@@ -64,7 +64,7 @@ func (a *Analyzer) Analyze(schedules []*database.CronSchedule) []*logger.StuckCr
 	// Analyze each job
 	for jobCode, schedList := range jobSchedules {
 		cronGroup := a.extractCronGroup(jobCode)
-		detectionCfg := a.config.GetDetectionConfig(cronGroup)
+		detectionCfg := a.config.GetDetectionConfig(jobCode, cronGroup)
 
 		// Get or create job state
 		state, exists := a.jobStates[jobCode]
