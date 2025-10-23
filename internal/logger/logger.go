@@ -241,7 +241,13 @@ func (l *Logger) LogStuckCron(alert *StuckCronAlert) {
 		fields["error_message"] = alert.ErrorMessage
 	}
 
-	l.log(LevelWarn, "STUCK CRON DETECTED", nil, fields)
+	// Use different message for scheduler alerts
+	message := "STUCK CRON DETECTED"
+	if alert.JobCode == "SCHEDULER" {
+		message = "STUCK CRON SCHEDULER"
+	}
+
+	l.log(LevelWarn, message, nil, fields)
 }
 
 // StuckCronAlert represents a stuck cron alert

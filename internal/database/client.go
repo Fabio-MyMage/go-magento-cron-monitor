@@ -243,3 +243,38 @@ func (c *Client) GetPendingJobCounts() (map[string]int, error) {
 
 	return counts, nil
 }
+
+// GetRecentlyCreatedJobCount returns count of jobs created within the specified time window
+func (c *Client) GetRecentlyCreatedJobCount(minutes int) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM cron_schedule 
+		WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+	`
+
+	var count int
+	err := c.db.QueryRow(query, minutes).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query recently created jobs: %w", err)
+	}
+
+	return count, nil
+}
+
+// GetUpcomingPendingJobCount returns count of pending jobs scheduled in the near future
+func (c *Client) GetUpcomingPendingJobCount(minutes int) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM cron_schedule 
+		WHERE status = 'pending' 
+		AND scheduled_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL ? MINUTE)
+	`
+
+	var count int
+	err := c.db.QueryRow(query, minutes).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query upcoming pending jobs: %w", err)
+	}
+
+	return count, nil
+}

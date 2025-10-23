@@ -40,6 +40,10 @@ type DetectionConfig struct {
 	MaxMissedCount     int           `mapstructure:"max_missed_count"`
 	LookbackWindow     time.Duration `mapstructure:"lookback_window"`
 	ThresholdChecks    int           `mapstructure:"threshold_checks"`      // Consecutive checks before alerting
+	
+	// Scheduler health check settings
+	SchedulerInactivityMinutes int `mapstructure:"scheduler_inactivity_minutes"` // No new jobs created in X minutes
+	SchedulerLookaheadMinutes  int `mapstructure:"scheduler_lookahead_minutes"`  // No pending jobs scheduled in next X minutes
 }
 
 // CronGroupConfig holds per-group configuration overrides

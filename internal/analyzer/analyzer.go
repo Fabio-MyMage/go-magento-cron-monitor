@@ -16,8 +16,9 @@ import (
 type Analyzer struct {
 	config *config.Config
 	// Track state across checks
-	jobStates map[string]*JobState
-	mu        sync.RWMutex
+	jobStates        map[string]*JobState
+	schedulerState   *SchedulerState
+	mu               sync.RWMutex
 }
 
 // JobState tracks the state of a cron job across multiple checks
@@ -32,11 +33,18 @@ type JobState struct {
 	MissedStreak     int
 }
 
+// SchedulerState tracks the cron scheduler health across checks
+type SchedulerState struct {
+	ConsecutiveInactive int
+	LastAlertTime       time.Time
+}
+
 // NewAnalyzer creates a new analyzer
 func NewAnalyzer(cfg *config.Config) *Analyzer {
 	return &Analyzer{
-		config:    cfg,
-		jobStates: make(map[string]*JobState),
+		config:         cfg,
+		jobStates:      make(map[string]*JobState),
+		schedulerState: &SchedulerState{},
 	}
 }
 
@@ -314,4 +322,72 @@ func (a *Analyzer) GetJobStates() map[string]*JobState {
 		states[k] = &stateCopy
 	}
 	return states
+}
+
+// CheckSchedulerHealth checks if the Magento cron scheduler is running
+func (a *Analyzer) CheckSchedulerHealth(dbClient *database.Client) *logger.StuckCronAlert {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	
+	cfg := a.config.Monitor.Detection
+	
+	// Use defaults if not configured
+	inactivityMinutes := cfg.SchedulerInactivityMinutes
+	if inactivityMinutes == 0 {
+		inactivityMinutes = 10 // Default: no new jobs in 10 minutes
+	}
+	
+	lookaheadMinutes := cfg.SchedulerLookaheadMinutes
+	if lookaheadMinutes == 0 {
+		lookaheadMinutes = 15 // Default: no pending jobs scheduled for next 15 minutes
+	}
+	
+	thresholdChecks := cfg.ThresholdChecks
+	if thresholdChecks == 0 {
+		thresholdChecks = 2
+	}
+	
+	// Check 1: Any jobs created recently?
+	recentCount, err := dbClient.GetRecentlyCreatedJobCount(inactivityMinutes)
+	if err != nil {
+		// Don't alert on query errors
+		return nil
+	}
+	
+	// Check 2: Any pending jobs scheduled for near future?
+	upcomingCount, err := dbClient.GetUpcomingPendingJobCount(lookaheadMinutes)
+	if err != nil {
+		// Don't alert on query errors
+		return nil
+	}
+	
+	// Scheduler is healthy if either check passes
+	if recentCount > 0 || upcomingCount > 0 {
+		// Reset consecutive counter
+		a.schedulerState.ConsecutiveInactive = 0
+		return nil
+	}
+	
+	// Scheduler appears inactive
+	a.schedulerState.ConsecutiveInactive++
+	
+	// Only alert after threshold consecutive detections
+	if a.schedulerState.ConsecutiveInactive < thresholdChecks {
+		return nil
+	}
+	
+	// Suppress duplicate alerts within 5 minutes
+	if time.Since(a.schedulerState.LastAlertTime) < 5*time.Minute {
+		return nil
+	}
+	
+	a.schedulerState.LastAlertTime = time.Now()
+	
+	return &logger.StuckCronAlert{
+		JobCode:          "SCHEDULER",
+		CronGroup:        "system",
+		Status:           "inactive",
+		Reason:           fmt.Sprintf("no jobs created in last %d minutes and no pending jobs scheduled for next %d minutes", inactivityMinutes, lookaheadMinutes),
+		ConsecutiveStuck: a.schedulerState.ConsecutiveInactive,
+	}
 }

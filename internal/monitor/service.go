@@ -92,6 +92,11 @@ func (s *Service) runCheck() error {
 	// Analyze for stuck crons
 	alerts := s.analyzer.Analyze(schedules)
 
+	// Check scheduler health
+	if schedulerAlert := s.analyzer.CheckSchedulerHealth(s.db); schedulerAlert != nil {
+		alerts = append(alerts, schedulerAlert)
+	}
+
 	// Log alerts
 	for _, alert := range alerts {
 		s.logger.LogStuckCron(alert)

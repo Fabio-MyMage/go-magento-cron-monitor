@@ -11,6 +11,7 @@ A Go CLI application that continuously monitors Magento 2 cron jobs by querying 
   - Consecutive errors
   - Missed executions
   - Threshold-based detection
+- 🚦 **Scheduler Health** - Detects if the Magento cron scheduler process (`php bin/magento cron:run`) has stopped
 - ⚙️ **Flexible Configuration** - YAML-based configuration with per-group overrides
 - 📝 **Structured Logging** - JSON or text format logging to file and stdout
 - 🎯 **Selective Monitoring** - Configure different thresholds for different cron groups
@@ -68,6 +69,10 @@ monitor:
     max_missed_count: 5
     # How far back to look in cron_schedule table
     lookback_window: 1h
+    
+    # Scheduler health detection
+    scheduler_inactivity_minutes: 10
+    scheduler_lookahead_minutes: 15
   
   # Optional: per-group overrides
   cron_groups:
@@ -103,6 +108,8 @@ logging:
 - `detection.consecutive_errors` - Alert after this many consecutive errors
 - `detection.max_missed_count` - Alert if job missed this many times in lookback window
 - `detection.lookback_window` - Time range to query from `cron_schedule` table
+- `detection.scheduler_inactivity_minutes` - Alert if no jobs created in this timeframe (default: 10)
+- `detection.scheduler_lookahead_minutes` - AND no pending jobs scheduled in next X minutes (default: 15)
 - `cron_groups` - Per-group overrides (auto-detected from job_code patterns)
 
 #### Logging Settings
@@ -119,6 +126,40 @@ logging:
 
 # Use custom config file
 ./go-magento-cron-monitor monitor --config /path/to/config.yaml
+```
+
+## Detection Criteria
+
+### Stuck Cron Jobs
+
+The monitor checks for several types of problems with individual cron jobs:
+
+1. **Long-Running Jobs** - Jobs that have been in `running` status longer than `max_running_time`
+2. **Pending Accumulation** - More than `max_pending_count` jobs with `pending` status for the same job code
+3. **Consecutive Errors** - Job has failed `consecutive_errors` times in a row
+4. **Missed Executions** - Job has `missed` status more than `max_missed_count` times within `lookback_window`
+
+All detections use threshold-based alerting: the condition must be detected `threshold_checks` consecutive times before an alert is logged. This reduces false positives from transient issues.
+
+### Scheduler Health (STUCK CRON SCHEDULER)
+
+In addition to monitoring individual cron jobs, the monitor also checks if the Magento cron scheduler process itself (`php bin/magento cron:run`) is running. This is critical because if the scheduler stops, jobs won't be created or executed even though they may appear "healthy" in the database.
+
+The scheduler is considered stuck when **BOTH** conditions are true:
+1. No new jobs have been created in the last `scheduler_inactivity_minutes` (default: 10 minutes)
+2. No pending jobs are scheduled for the next `scheduler_lookahead_minutes` (default: 15 minutes)
+
+This dual-check approach prevents false positives during normal periods of low cron activity. The alert will be logged as:
+
+```json
+{
+  "timestamp": "2025-01-22T09:59:00Z",
+  "level": "ERROR",
+  "message": "STUCK CRON SCHEDULER",
+  "job_code": "SCHEDULER",
+  "group": "system",
+  "reason": "No jobs created in 10 minutes and no pending jobs scheduled for next 15 minutes"
+}
 ```
 
 ## Deployment

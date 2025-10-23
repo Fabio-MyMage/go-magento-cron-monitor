@@ -18,6 +18,10 @@ monitor:
     lookback_window: 1h         # How far back to query cron_schedule
     threshold_checks: 2         # Number of consecutive detections before alerting (reduces false positives)
     
+    # Scheduler health detection (monitors if php bin/magento cron:run is actually running)
+    scheduler_inactivity_minutes: 10  # Alert if no jobs created in this many minutes
+    scheduler_lookahead_minutes: 15   # AND no pending jobs scheduled in next X minutes
+    
   # Per-group configuration overrides (optional)
   cron_groups:
     - name: index
