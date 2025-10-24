@@ -166,7 +166,7 @@ func (a *Analyzer) checkPendingAccumulation(schedules []*database.CronSchedule, 
 				CronGroup:        state.CronGroup,
 				Status:           "pending",
 				PendingCount:     pendingCount,
-				Reason:           fmt.Sprintf("too many pending jobs (%d > %d)", pendingCount, cfg.MaxPendingCount),
+				Reason:           fmt.Sprintf("too many pending jobs (%d exceeds threshold of %d)", pendingCount, cfg.MaxPendingCount),
 				ConsecutiveStuck: state.ConsecutiveStuck,
 			}
 		}
@@ -209,7 +209,7 @@ func (a *Analyzer) checkConsecutiveErrors(schedules []*database.CronSchedule, cf
 				CronGroup:        state.CronGroup,
 				Status:           "error",
 				ErrorCount:       errorCount,
-				Reason:           fmt.Sprintf("consecutive errors detected (%d >= %d)", errorCount, cfg.ConsecutiveErrors),
+				Reason:           fmt.Sprintf("consecutive errors detected (%d meets threshold of %d)", errorCount, cfg.ConsecutiveErrors),
 				ConsecutiveStuck: state.ConsecutiveStuck,
 			}
 
@@ -250,7 +250,7 @@ func (a *Analyzer) checkMissedExecutions(schedules []*database.CronSchedule, cfg
 				CronGroup:        state.CronGroup,
 				Status:           "missed",
 				MissedCount:      missedCount,
-				Reason:           fmt.Sprintf("too many missed executions (%d >= %d)", missedCount, cfg.MaxMissedCount),
+				Reason:           fmt.Sprintf("too many missed executions (%d exceeds threshold of %d)", missedCount, cfg.MaxMissedCount),
 				ConsecutiveStuck: state.ConsecutiveStuck,
 			}
 		}
