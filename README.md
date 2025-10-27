@@ -30,8 +30,8 @@ Download the latest release for your platform from the [Releases page](https://g
 
 ```bash
 # Example for Linux amd64
-wget https://github.com/Fabio-MyMage/go-magento-cron-monitor/releases/download/v0.0.1/go-magento-cron-monitor_0.0.1_linux_amd64.tar.gz
-tar -xzf go-magento-cron-monitor_1.0.1_linux_amd64.tar.gz
+wget https://github.com/Fabio-MyMage/go-magento-cron-monitor/releases/download/v0.0.2/go-magento-cron-monitor_0.0.2_linux_arm64.tar.gz
+tar -xzf go-magento-cron-monitor_0.0.2_linux_amd64.tar.gz
 sudo mv go-magento-cron-monitor /usr/local/bin/
 ```
 
