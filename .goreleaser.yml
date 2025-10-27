@@ -69,3 +69,23 @@ release:
     ## Magento 2 Cron Monitor {{.Version}}
     
     Monitor Magento 2 cron jobs for stuck processes, pending accumulation, errors, and scheduler health.
+  footer: |
+    ## Installation
+    
+    1. Download the appropriate binary for your OS/architecture
+    2. Extract the archive: `tar -xzf go-magento-cron-monitor_*.tar.gz` (or unzip for Windows)
+    3. Make executable (Linux/Mac): `chmod +x go-magento-cron-monitor`
+    4. Move to PATH: `sudo mv go-magento-cron-monitor /usr/local/bin/`
+    5. Copy and configure: `cp config.example.yaml config.yaml`
+    
+    ## Quick Start
+    
+    ```bash
+    # Test database connection
+    ./go-magento-cron-monitor test --config config.yaml
+    
+    # Start monitoring
+    ./go-magento-cron-monitor monitor --config config.yaml
+    ```
+    
+    **Full Changelog**: https://github.com/Fabio-MyMage/go-magento-cron-monitor/compare/{{.PreviousTag}}...{{.Tag}}
