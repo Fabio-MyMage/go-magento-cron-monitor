@@ -32,3 +32,6 @@ config.yaml
 # OS
 .DS_Store
 Thumbs.db
+
+# GoReleaser
+dist/

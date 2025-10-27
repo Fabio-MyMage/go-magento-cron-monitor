@@ -20,15 +20,27 @@ A Go CLI application that continuously monitors Magento 2 cron jobs by querying 
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.21 or higher (for building from source)
 - MySQL/MariaDB database with Magento 2 schema
 - Access to `cron_schedule` table
+
+### Download Pre-built Binary
+
+Download the latest release for your platform from the [Releases page](https://github.com/Fabio-MyMage/go-magento-cron-monitor/releases).
+
+```bash
+# Example for Linux amd64
+wget https://github.com/Fabio-MyMage/go-magento-cron-monitor/releases/download/v1.0.0/go-magento-cron-monitor_1.0.0_linux_amd64.tar.gz
+tar -xzf go-magento-cron-monitor_1.0.0_linux_amd64.tar.gz
+sudo mv go-magento-cron-monitor /usr/local/bin/
+```
 
 ### Build from Source
 
 ```bash
 # Clone the repository
-cd /path/to/go-magento-cron-monitor
+git clone https://github.com/Fabio-MyMage/go-magento-cron-monitor.git
+cd go-magento-cron-monitor
 
 # Download dependencies
 go mod download
