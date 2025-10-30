@@ -200,11 +200,11 @@ Create `/etc/systemd/system/magento-cron-monitor.service`:
 ```ini
 [Unit]
 Description=Magento 2 Cron Monitor
-After=network.target mysql.service
+After=network.target
 
 [Service]
 Type=simple
-User=magento
+User=magento-monitor
 WorkingDirectory=/opt/magento-cron-monitor
 ExecStart=/opt/magento-cron-monitor/go-magento-cron-monitor monitor --config /etc/magento-cron-monitor/config.yaml
 Restart=on-failure
