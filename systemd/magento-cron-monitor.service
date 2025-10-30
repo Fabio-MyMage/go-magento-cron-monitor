@@ -1,6 +1,6 @@
 [Unit]
 Description=Magento 2 Cron Monitor
-After=network.target mysql.service
+After=network.target
 
 [Service]
 Type=simple
