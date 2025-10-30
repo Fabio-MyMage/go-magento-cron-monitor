@@ -1,0 +1,14 @@
+[Unit]
+Description=Magento 2 Cron Monitor
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=magento-monitor
+WorkingDirectory=/opt/magento-cron-monitor
+ExecStart=/opt/magento-cron-monitor/go-magento-cron-monitor monitor --config /etc/magento-cron-monitor/config.yaml
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
