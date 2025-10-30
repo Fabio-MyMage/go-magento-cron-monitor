@@ -61,3 +61,19 @@ logging:
   file: /var/log/magento-cron-monitor.log
   level: info  # debug, info, warn, error
   format: json # json or text
+
+notifications:
+  slack:
+    enabled: false
+    # Multiple webhook URLs - notifications will be sent to all of them
+    webhook_urls:
+      - "https://hooks.slack.com/services/YOUR/WEBHOOK/URL1"
+      # - "https://hooks.slack.com/services/YOUR/WEBHOOK/URL2"
+    # Cooldown between stuck cron alerts for the same cron job
+    alert_cooldown: 15m
+    # Send recovery notifications when cron jobs become healthy
+    send_recovery: true
+    # Cooldown between recovery notifications for the same cron job
+    recovery_cooldown: 5m
+    # HTTP timeout for webhook requests
+    timeout: 10s

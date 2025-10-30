@@ -12,6 +12,11 @@ A Go CLI application that continuously monitors Magento 2 cron jobs by querying 
   - Missed executions
   - Threshold-based detection
 - 🚦 **Scheduler Health** - Detects if the Magento cron scheduler process (`php bin/magento cron:run`) has stopped
+- � **Slack Notifications** - Optional webhook integration for real-time alerts:
+  - Stuck cron job notifications with detailed metrics
+  - Recovery notifications when jobs resume normal operation
+  - Configurable cooldown periods to prevent spam
+  - Support for multiple webhook URLs
 - ⚙️ **Flexible Configuration** - YAML-based configuration with per-group overrides
 - 📝 **Structured Logging** - JSON or text format logging to file and stdout
 - 🎯 **Selective Monitoring** - Configure different thresholds for different cron groups
@@ -105,6 +110,16 @@ logging:
   file: "./logs/magento-cron-monitor.log"
   level: "info"  # debug, info, warn, error
   format: "json"  # json or text
+
+notifications:
+  slack:
+    enabled: false  # Set to true to enable Slack notifications
+    webhook_urls:
+      - "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    alert_cooldown: 15m
+    send_recovery: true
+    recovery_cooldown: 5m
+    timeout: 10s
 ```
 
 ### Configuration Options
@@ -146,6 +161,15 @@ Example: If `indexer_reindex_all_invalid` has a job override with `max_running_t
 - `file` - Path to log file (directory will be created if needed)
 - `level` - Log level: `debug`, `info`, `warn`, `error`
 - `format` - Log format: `json` or `text`
+
+#### Notification Settings
+
+- `slack.enabled` - Enable/disable Slack notifications
+- `slack.webhook_urls` - Array of Slack incoming webhook URLs (notifications sent to all)
+- `slack.alert_cooldown` - Minimum time between stuck alerts for same cron job (e.g., `15m`)
+- `slack.send_recovery` - Send notifications when stuck cron jobs recover
+- `slack.recovery_cooldown` - Minimum time between recovery notifications (e.g., `5m`)
+- `slack.timeout` - HTTP timeout for webhook requests
 
 ## Usage
 
@@ -190,6 +214,34 @@ This dual-check approach prevents false positives during normal periods of low c
   "reason": "No jobs created in 10 minutes and no pending jobs scheduled for next 15 minutes"
 }
 ```
+
+### Slack Integration
+
+To set up Slack notifications:
+
+1. Create a Slack incoming webhook:
+   - Go to your Slack workspace settings
+   - Navigate to **Apps** → **Incoming Webhooks**
+   - Click **Add to Slack** and select a channel
+   - Copy the webhook URL
+
+2. Add the webhook URL(s) to your `config.yaml`:
+   ```yaml
+   notifications:
+     slack:
+       enabled: true
+       webhook_urls:
+         - "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+   ```
+
+3. Customize notification settings:
+   - Adjust `alert_cooldown` to prevent spam (default: 15 minutes)
+   - Enable/disable `send_recovery` for recovery notifications
+   - Add multiple webhook URLs to send to different channels
+
+**Notification Types:**
+- **Stuck Cron Job Alert** 🚨 - Sent when a cron job becomes stuck, includes detailed metrics (job code, status, last execution, reason)
+- **Cron Job Recovered** ✅ - Sent when a stuck cron job resumes normal operation, includes recovery duration
 
 ## Deployment
 

@@ -31,12 +31,27 @@ type JobState struct {
 	LastAlertTime    time.Time
 	ErrorStreak      int
 	MissedStreak     int
+	// Slack notification tracking
+	LastSlackAlert time.Time // Track last Slack notification time
+	LastKnownState string    // "healthy" or "stuck"
+	StuckSince     time.Time // When cron became stuck
 }
 
 // SchedulerState tracks the cron scheduler health across checks
 type SchedulerState struct {
 	ConsecutiveInactive int
 	LastAlertTime       time.Time
+}
+
+// StateTransition represents a cron state change
+type StateTransition struct {
+	CronCode      string
+	FromState     string // "healthy" or "stuck"
+	ToState       string // "healthy" or "stuck"
+	Timestamp     time.Time
+	StuckDuration time.Duration // For stuck→healthy transitions
+	Status        string
+	LastExecution time.Time
 }
 
 // NewAnalyzer creates a new analyzer
@@ -390,4 +405,113 @@ func (a *Analyzer) CheckSchedulerHealth(dbClient *database.Client) *logger.Stuck
 		Reason:           fmt.Sprintf("no jobs created in last %d minutes and no pending jobs scheduled for next %d minutes", inactivityMinutes, lookaheadMinutes),
 		ConsecutiveStuck: a.schedulerState.ConsecutiveInactive,
 	}
+}
+
+// GetCronState returns the state for a specific cron job
+func (a *Analyzer) GetCronState(cronCode string) *JobState {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.jobStates[cronCode]
+}
+
+// DetectStateTransitions detects state transitions for Slack notifications
+// This should be called after Analyze() to detect healthy/stuck transitions
+func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []StateTransition {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	transitions := make([]StateTransition, 0)
+
+	// Group schedules by job_code
+	jobSchedules := make(map[string][]*database.CronSchedule)
+	for _, s := range schedules {
+		jobSchedules[s.JobCode] = append(jobSchedules[s.JobCode], s)
+	}
+
+	// Check each job for state transitions
+	for jobCode, schedList := range jobSchedules {
+		state := a.jobStates[jobCode]
+		if state == nil {
+			continue
+		}
+
+		cronGroup := a.extractCronGroup(jobCode)
+		detectionCfg := a.config.GetDetectionConfig(jobCode, cronGroup)
+
+		// Determine if currently healthy or stuck
+		isHealthy := a.isJobHealthy(schedList, detectionCfg, state)
+
+		// Initialize state if empty
+		if state.LastKnownState == "" {
+			state.LastKnownState = "healthy"
+		}
+
+		// Detect healthy → stuck transition
+		if !isHealthy && state.LastKnownState == "healthy" {
+			state.StuckSince = time.Now()
+
+			// Get last execution time
+			var lastExec time.Time
+			for _, s := range schedList {
+				if s.ExecutedAt.Valid && (lastExec.IsZero() || s.ExecutedAt.Time.After(lastExec)) {
+					lastExec = s.ExecutedAt.Time
+				}
+			}
+
+			transitions = append(transitions, StateTransition{
+				CronCode:      jobCode,
+				FromState:     "healthy",
+				ToState:       "stuck",
+				Timestamp:     time.Now(),
+				Status:        state.LastStatus,
+				LastExecution: lastExec,
+			})
+			state.LastKnownState = "stuck"
+		}
+
+		// Detect stuck → healthy transition
+		if isHealthy && state.LastKnownState == "stuck" {
+			duration := time.Since(state.StuckSince)
+
+			// Get last execution time
+			var lastExec time.Time
+			for _, s := range schedList {
+				if s.ExecutedAt.Valid && (lastExec.IsZero() || s.ExecutedAt.Time.After(lastExec)) {
+					lastExec = s.ExecutedAt.Time
+				}
+			}
+
+			transitions = append(transitions, StateTransition{
+				CronCode:      jobCode,
+				FromState:     "stuck",
+				ToState:       "healthy",
+				Timestamp:     time.Now(),
+				StuckDuration: duration,
+				Status:        "healthy",
+				LastExecution: lastExec,
+			})
+			state.LastKnownState = "healthy"
+			state.StuckSince = time.Time{}
+		}
+	}
+
+	return transitions
+}
+
+// isJobHealthy determines if a job is currently healthy (not stuck)
+func (a *Analyzer) isJobHealthy(schedules []*database.CronSchedule, cfg config.DetectionConfig, state *JobState) bool {
+	// Check if any stuck condition is met
+	if a.checkLongRunning(schedules, cfg, state) != nil {
+		return false
+	}
+	if a.checkPendingAccumulation(schedules, cfg, state) != nil {
+		return false
+	}
+	if a.checkConsecutiveErrors(schedules, cfg, state) != nil {
+		return false
+	}
+	if a.checkMissedExecutions(schedules, cfg, state) != nil {
+		return false
+	}
+	return true
 }

@@ -9,31 +9,54 @@ import (
 	"github.com/fabio/go-magento-cron-monitor/internal/config"
 	"github.com/fabio/go-magento-cron-monitor/internal/database"
 	"github.com/fabio/go-magento-cron-monitor/internal/logger"
+	"github.com/fabio/go-magento-cron-monitor/internal/slack"
 )
 
 // Service manages the monitoring loop
 type Service struct {
-	config    *config.Config
-	db        *database.Client
-	logger    *logger.Logger
-	analyzer  *analyzer.Analyzer
-	verbosity int
-	ctx       context.Context
-	cancel    context.CancelFunc
+	config      *config.Config
+	db          *database.Client
+	logger      *logger.Logger
+	analyzer    *analyzer.Analyzer
+	slackClient *slack.Client
+	verbosity   int
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // NewService creates a new monitor service
 func NewService(cfg *config.Config, db *database.Client, log *logger.Logger, verbosity int) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Create Slack client if enabled
+	var slackClient *slack.Client
+	if cfg.Notifications.Slack.Enabled {
+		slackConfig := slack.Config{
+			Enabled:          cfg.Notifications.Slack.Enabled,
+			WebhookURLs:      cfg.Notifications.Slack.WebhookURLs,
+			AlertCooldown:    cfg.Notifications.Slack.AlertCooldown,
+			SendRecovery:     cfg.Notifications.Slack.SendRecovery,
+			RecoveryCooldown: cfg.Notifications.Slack.RecoveryCooldown,
+			Timeout:          cfg.Notifications.Slack.Timeout,
+		}
+		slackClient = slack.New(slackConfig)
+		log.Info("Slack notifications enabled", map[string]interface{}{
+			"webhook_count":     len(slackConfig.WebhookURLs),
+			"alert_cooldown":    slackConfig.AlertCooldown.String(),
+			"send_recovery":     slackConfig.SendRecovery,
+			"recovery_cooldown": slackConfig.RecoveryCooldown.String(),
+		})
+	}
+
 	return &Service{
-		config:    cfg,
-		db:        db,
-		logger:    log,
-		analyzer:  analyzer.NewAnalyzer(cfg),
-		verbosity: verbosity,
-		ctx:       ctx,
-		cancel:    cancel,
+		config:      cfg,
+		db:          db,
+		logger:      log,
+		analyzer:    analyzer.NewAnalyzer(cfg),
+		slackClient: slackClient,
+		verbosity:   verbosity,
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 }
 
@@ -102,6 +125,18 @@ func (s *Service) runCheck() error {
 		s.logger.LogStuckCron(alert)
 	}
 
+	// Detect state transitions for Slack notifications
+	if s.slackClient != nil {
+		transitions := s.analyzer.DetectStateTransitions(schedules)
+		for _, transition := range transitions {
+			if err := s.handleStateTransition(transition, time.Now()); err != nil {
+				s.logger.Error("Failed to send Slack notification", err, map[string]interface{}{
+					"cron_code": transition.CronCode,
+				})
+			}
+		}
+	}
+
 	// Log summary
 	s.logCheckSummary(schedules, alerts, time.Since(start))
 
@@ -164,4 +199,70 @@ func (s *Service) logJobStates() {
 			})
 		}
 	}
+}
+
+// handleStateTransition processes state transitions and sends Slack notifications
+func (s *Service) handleStateTransition(transition analyzer.StateTransition, now time.Time) error {
+	state := s.analyzer.GetCronState(transition.CronCode)
+	if state == nil {
+		return fmt.Errorf("cron state not found: %s", transition.CronCode)
+	}
+
+	// Determine cooldown based on transition type
+	var cooldown time.Duration
+	var alertType slack.AlertType
+
+	if transition.ToState == "stuck" {
+		// Cron became stuck
+		cooldown = s.config.Notifications.Slack.AlertCooldown
+		alertType = slack.AlertTypeStuck
+	} else if transition.ToState == "healthy" {
+		// Cron recovered
+		if !s.config.Notifications.Slack.SendRecovery {
+			s.logger.Debug("Skipping recovery notification (disabled)", map[string]interface{}{
+				"cron_code": transition.CronCode,
+			})
+			return nil
+		}
+		cooldown = s.config.Notifications.Slack.RecoveryCooldown
+		alertType = slack.AlertTypeRecovered
+	} else {
+		return nil
+	}
+
+	// Check cooldown
+	if !state.LastSlackAlert.IsZero() && now.Sub(state.LastSlackAlert) < cooldown {
+		s.logger.Debug("Skipping Slack notification (cooldown active)", map[string]interface{}{
+			"cron_code":       transition.CronCode,
+			"alert_type":      string(alertType),
+			"cooldown":        cooldown.String(),
+			"time_since_last": now.Sub(state.LastSlackAlert).String(),
+		})
+		return nil
+	}
+
+	// Create Slack alert
+	slackAlert := slack.CronAlert{
+		Type:          alertType,
+		CronCode:      transition.CronCode,
+		Status:        transition.Status,
+		LastExecution: transition.LastExecution,
+		StuckDuration: transition.StuckDuration,
+		Timestamp:     now,
+	}
+
+	// Send notification
+	if err := s.slackClient.SendAlert(slackAlert); err != nil {
+		return err
+	}
+
+	// Update last alert time
+	state.LastSlackAlert = now
+
+	s.logger.Info("Sent Slack notification", map[string]interface{}{
+		"cron_code":  transition.CronCode,
+		"alert_type": string(alertType),
+	})
+
+	return nil
 }

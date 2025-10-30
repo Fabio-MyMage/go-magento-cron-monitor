@@ -11,9 +11,25 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Database DatabaseConfig `mapstructure:"database"`
-	Monitor  MonitorConfig  `mapstructure:"monitor"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
+	Database      DatabaseConfig      `mapstructure:"database"`
+	Monitor       MonitorConfig       `mapstructure:"monitor"`
+	Logging       LoggingConfig       `mapstructure:"logging"`
+	Notifications NotificationsConfig `mapstructure:"notifications"`
+}
+
+// NotificationsConfig contains notification settings
+type NotificationsConfig struct {
+	Slack SlackConfig `mapstructure:"slack"`
+}
+
+// SlackConfig contains Slack notification settings
+type SlackConfig struct {
+	Enabled          bool          `mapstructure:"enabled"`
+	WebhookURLs      []string      `mapstructure:"webhook_urls"`
+	AlertCooldown    time.Duration `mapstructure:"alert_cooldown"`
+	SendRecovery     bool          `mapstructure:"send_recovery"`
+	RecoveryCooldown time.Duration `mapstructure:"recovery_cooldown"`
+	Timeout          time.Duration `mapstructure:"timeout"`
 }
 
 // DatabaseConfig holds database connection settings
@@ -132,6 +148,17 @@ func Load(configPath string) (*Config, error) {
 	}
 	if cfg.Database.Port == 0 {
 		cfg.Database.Port = 3306
+	}
+
+	// Notification defaults
+	if cfg.Notifications.Slack.AlertCooldown == 0 {
+		cfg.Notifications.Slack.AlertCooldown = 15 * time.Minute
+	}
+	if cfg.Notifications.Slack.RecoveryCooldown == 0 {
+		cfg.Notifications.Slack.RecoveryCooldown = 5 * time.Minute
+	}
+	if cfg.Notifications.Slack.Timeout == 0 {
+		cfg.Notifications.Slack.Timeout = 10 * time.Second
 	}
 
 	// Validate
