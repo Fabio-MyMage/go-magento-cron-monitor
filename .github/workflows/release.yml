@@ -3,10 +3,10 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # Triggers on tags like v0.0.1, v1.0.0, v1.2.3, etc.
 
 permissions:
-  contents: write
+  contents: write  # Required to create releases
 
 jobs:
   goreleaser:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Required for changelog generation
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -23,10 +23,10 @@ jobs:
           go-version: '1.21'
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: '~> v2'
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

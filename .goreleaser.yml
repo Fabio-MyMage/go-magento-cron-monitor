@@ -1,10 +1,16 @@
+# GoReleaser configuration for go-magento-cron-monitor
+version: 2
+
 before:
   hooks:
     - go mod tidy
     - go mod download
 
 builds:
-  - env:
+  - id: go-magento-cron-monitor
+    binary: go-magento-cron-monitor
+    main: ./main.go
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -13,23 +19,26 @@ builds:
     goarch:
       - amd64
       - arm64
+    # Skip unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
-    binary: go-magento-cron-monitor
 
 archives:
-  - format: tar.gz
+  - id: default
+    format_overrides:
+      - goos: windows
+        format: zip
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - README.md
       - config.example.yaml
@@ -38,7 +47,7 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
@@ -47,13 +56,14 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^chore:'
-      - '^ci:'
+      - Merge pull request
+      - Merge branch
   groups:
     - title: Features
-      regexp: '^feat:'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
       order: 0
     - title: Bug Fixes
-      regexp: '^fix:'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
       order: 1
     - title: Others
       order: 999
@@ -66,9 +76,9 @@ release:
   prerelease: auto
   name_template: "{{.ProjectName}} {{.Version}}"
   header: |
-    ## Magento 2 Cron Monitor {{.Version}}
+    ## Magento 2 Cron Monitor - Release {{.Version}}
     
-    Monitor Magento 2 cron jobs for stuck processes, pending accumulation, errors, and scheduler health.
+    Download the appropriate binary for your platform below.
   footer: |
     ## Installation
     
@@ -86,6 +96,9 @@ release:
     
     # Start monitoring
     ./go-magento-cron-monitor monitor --config config.yaml
+    
+    # Run as daemon with verbose logging
+    ./go-magento-cron-monitor monitor --config config.yaml -d -vvv
     ```
     
     **Full Changelog**: https://github.com/Fabio-MyMage/go-magento-cron-monitor/compare/{{.PreviousTag}}...{{.Tag}}
