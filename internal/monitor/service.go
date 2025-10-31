@@ -128,8 +128,21 @@ func (s *Service) runCheck() error {
 	// Detect state transitions for Slack notifications
 	if s.slackClient != nil {
 		transitions := s.analyzer.DetectStateTransitions(schedules)
+		
+		// Create alert lookup map for enriching transitions
+		alertMap := make(map[string]*logger.StuckCronAlert)
+		for _, alert := range alerts {
+			alertMap[alert.JobCode] = alert
+		}
+		
 		for _, transition := range transitions {
-			if err := s.handleStateTransition(transition, time.Now()); err != nil {
+			// Find corresponding alert for additional details
+			var enrichedAlert *logger.StuckCronAlert
+			if alert, exists := alertMap[transition.CronCode]; exists {
+				enrichedAlert = alert
+			}
+			
+			if err := s.handleStateTransition(transition, time.Now(), enrichedAlert); err != nil {
 				s.logger.Error("Failed to send Slack notification", err, map[string]interface{}{
 					"cron_code": transition.CronCode,
 				})
@@ -202,7 +215,7 @@ func (s *Service) logJobStates() {
 }
 
 // handleStateTransition processes state transitions and sends Slack notifications
-func (s *Service) handleStateTransition(transition analyzer.StateTransition, now time.Time) error {
+func (s *Service) handleStateTransition(transition analyzer.StateTransition, now time.Time, enrichedAlert *logger.StuckCronAlert) error {
 	state := s.analyzer.GetCronState(transition.CronCode)
 	if state == nil {
 		return fmt.Errorf("cron state not found: %s", transition.CronCode)
@@ -249,6 +262,18 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 		LastExecution: transition.LastExecution,
 		StuckDuration: transition.StuckDuration,
 		Timestamp:     now,
+	}
+	
+	// Enrich with detailed alert data if available
+	if enrichedAlert != nil {
+		slackAlert.CronGroup = enrichedAlert.CronGroup
+		slackAlert.RunningTime = enrichedAlert.RunningTime
+		slackAlert.ScheduledAt = enrichedAlert.ScheduledAt
+		slackAlert.Reason = enrichedAlert.Reason
+		slackAlert.ConsecutiveStuck = enrichedAlert.ConsecutiveStuck
+		slackAlert.PendingCount = enrichedAlert.PendingCount
+		slackAlert.ErrorCount = enrichedAlert.ErrorCount
+		slackAlert.MissedCount = enrichedAlert.MissedCount
 	}
 
 	// Send notification

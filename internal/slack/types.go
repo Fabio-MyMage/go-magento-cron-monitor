@@ -18,6 +18,16 @@ type CronAlert struct {
 	LastExecution time.Time
 	StuckDuration time.Duration // For recovery notifications
 	Timestamp     time.Time
+	
+	// Enhanced fields for detailed alerts
+	CronGroup        string
+	RunningTime      *time.Duration
+	ScheduledAt      *time.Time
+	Reason           string
+	ConsecutiveStuck int
+	PendingCount     int
+	ErrorCount       int
+	MissedCount      int
 }
 
 // Message represents a Slack message with blocks

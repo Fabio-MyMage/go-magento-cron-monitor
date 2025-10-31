@@ -20,6 +20,16 @@ func formatStuckMessage(alert CronAlert) Message {
 	if !alert.LastExecution.IsZero() {
 		lastExec = alert.LastExecution.UTC().Format("2006-01-02 15:04:05 UTC")
 	}
+	
+	scheduledAt := "N/A"
+	if alert.ScheduledAt != nil && !alert.ScheduledAt.IsZero() {
+		scheduledAt = alert.ScheduledAt.UTC().Format("2006-01-02 15:04:05 UTC")
+	}
+	
+	runningTime := "N/A"
+	if alert.RunningTime != nil {
+		runningTime = formatDuration(*alert.RunningTime)
+	}
 
 	return Message{
 		Text: fmt.Sprintf("🚨 Cron job `%s` is stuck!", alert.CronCode),
@@ -35,22 +45,38 @@ func formatStuckMessage(alert CronAlert) Message {
 				Type: "section",
 				Fields: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Job:*\n`%s`", alert.CronCode)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Status:*\n%s", alert.Status)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Last Execution:*\n%s", lastExec)},
-					{Type: "mrkdwn", Text: "*Current Status:*\n🔴 Stuck"},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Database Status:*\n%s", alert.Status)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Group:*\n%s", alert.CronGroup)},
+					{Type: "mrkdwn", Text: "*Monitor Status:*\n🔴 Stuck"},
 				},
 			},
 			{
 				Type: "section",
 				Text: &TextObject{
 					Type: "mrkdwn",
-					Text: "The cron job is not running as expected and requires attention.",
+					Text: "*⏱️ Timing Details:*",
+				},
+			},
+			{
+				Type: "section",
+				Fields: []TextObject{
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Scheduled At:*\n%s", scheduledAt)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Last Execution:*\n%s", lastExec)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Running Time:*\n%s", runningTime)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Consecutive Issues:*\n%d", alert.ConsecutiveStuck)},
+				},
+			},
+			{
+				Type: "section",
+				Text: &TextObject{
+					Type: "mrkdwn",
+					Text: fmt.Sprintf("*🔍 Problem Details:*\n%s", alert.Reason),
 				},
 			},
 			{
 				Type: "context",
 				Elements: []TextObject{
-					{Type: "mrkdwn", Text: fmt.Sprintf("🕒 %s", timestamp)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("🕒 Alerted at %s", timestamp)},
 				},
 			},
 		},
@@ -61,6 +87,11 @@ func formatStuckMessage(alert CronAlert) Message {
 func formatRecoveryMessage(alert CronAlert) Message {
 	timestamp := alert.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC")
 	duration := formatDuration(alert.StuckDuration)
+	
+	lastExec := "Never"
+	if !alert.LastExecution.IsZero() {
+		lastExec = alert.LastExecution.UTC().Format("2006-01-02 15:04:05 UTC")
+	}
 
 	return Message{
 		Text: fmt.Sprintf("✅ Cron job `%s` has recovered!", alert.CronCode),
@@ -76,9 +107,23 @@ func formatRecoveryMessage(alert CronAlert) Message {
 				Type: "section",
 				Fields: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Job:*\n`%s`", alert.CronCode)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Database Status:*\n%s", alert.Status)},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Group:*\n%s", alert.CronGroup)},
+					{Type: "mrkdwn", Text: "*Monitor Status:*\n🟢 Healthy"},
+				},
+			},
+			{
+				Type: "section",
+				Fields: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Was Stuck For:*\n%s ⏱️", duration)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Status:*\n%s", alert.Status)},
-					{Type: "mrkdwn", Text: "*Current Status:*\n🟢 Healthy"},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Last Successful Execution:*\n%s", lastExec)},
+				},
+			},
+			{
+				Type: "section",
+				Text: &TextObject{
+					Type: "mrkdwn",
+					Text: fmt.Sprintf("*📝 Recovery Details:*\n• Original Issue: %s", alert.Reason),
 				},
 			},
 			{

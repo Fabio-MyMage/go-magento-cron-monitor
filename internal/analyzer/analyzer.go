@@ -52,6 +52,16 @@ type StateTransition struct {
 	StuckDuration time.Duration // For stuck→healthy transitions
 	Status        string
 	LastExecution time.Time
+	
+	// Enhanced fields for detailed Slack alerts
+	CronGroup        string
+	RunningTime      *time.Duration
+	ScheduledAt      *time.Time
+	Reason           string
+	ConsecutiveStuck int
+	PendingCount     int
+	ErrorCount       int
+	MissedCount      int
 }
 
 // NewAnalyzer creates a new analyzer
