@@ -460,21 +460,42 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 		if !isNotAlerting && state.LastKnownState == "not_alerting" {
 			state.StuckSince = time.Now()
 
-			// Get last execution time
+			// Get last execution time and enhanced data from schedules
 			var lastExec time.Time
+			var scheduledAt *time.Time
+			var runningTime *time.Duration
+			var currentStatus string
+			
 			for _, s := range schedList {
 				if s.ExecutedAt.Valid && (lastExec.IsZero() || s.ExecutedAt.Time.After(lastExec)) {
 					lastExec = s.ExecutedAt.Time
 				}
+				if scheduledAt == nil || s.ScheduledAt.After(*scheduledAt) {
+					scheduledAt = &s.ScheduledAt
+				}
+				// Calculate running time for running jobs
+				if s.Status == "running" && s.ExecutedAt.Valid {
+					runtime := time.Since(s.ExecutedAt.Time)
+					runningTime = &runtime
+					currentStatus = s.Status
+				}
+				if currentStatus == "" {
+					currentStatus = s.Status
+				}
 			}
 
 			transitions = append(transitions, StateTransition{
-				CronCode:      jobCode,
-				FromState:     "not_alerting",
-				ToState:       "alerting",
-				Timestamp:     time.Now(),
-				Status:        state.LastStatus,
-				LastExecution: lastExec,
+				CronCode:         jobCode,
+				FromState:        "not_alerting",
+				ToState:          "alerting",
+				Timestamp:        time.Now(),
+				Status:           currentStatus,
+				LastExecution:    lastExec,
+				CronGroup:        cronGroup,
+				RunningTime:      runningTime,
+				ScheduledAt:      scheduledAt,
+				Reason:           "Analysis detected issues - check problem details in alert",
+				ConsecutiveStuck: state.ConsecutiveStuck,
 			})
 			state.LastKnownState = "alerting"
 		}
@@ -483,22 +504,35 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 		if isNotAlerting && state.LastKnownState == "alerting" {
 			duration := time.Since(state.StuckSince)
 
-			// Get last execution time
+			// Get last execution time and enhanced data from schedules
 			var lastExec time.Time
+			var scheduledAt *time.Time
+			var currentStatus string
+			
 			for _, s := range schedList {
 				if s.ExecutedAt.Valid && (lastExec.IsZero() || s.ExecutedAt.Time.After(lastExec)) {
 					lastExec = s.ExecutedAt.Time
 				}
+				if scheduledAt == nil || s.ScheduledAt.After(*scheduledAt) {
+					scheduledAt = &s.ScheduledAt
+				}
+				if currentStatus == "" {
+					currentStatus = s.Status
+				}
 			}
 
 			transitions = append(transitions, StateTransition{
-				CronCode:      jobCode,
-				FromState:     "alerting",
-				ToState:       "not_alerting",
-				Timestamp:     time.Now(),
-				StuckDuration: duration,
-				Status:        "not_alerting",
-				LastExecution: lastExec,
+				CronCode:         jobCode,
+				FromState:        "alerting",
+				ToState:          "not_alerting",
+				Timestamp:        time.Now(),
+				StuckDuration:    duration,
+				Status:           currentStatus,
+				LastExecution:    lastExec,
+				CronGroup:        cronGroup,
+				ScheduledAt:      scheduledAt,
+				Reason:           "Issues resolved - cron job returned to normal operation",
+				ConsecutiveStuck: 0, // Reset since it's no longer alerting
 			})
 			state.LastKnownState = "not_alerting"
 			state.StuckSince = time.Time{}

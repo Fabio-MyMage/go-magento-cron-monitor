@@ -45,9 +45,9 @@ func formatAlertingMessage(alert CronAlert) Message {
 				Type: "section",
 				Fields: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Job:*\n`%s`", alert.CronCode)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Database Status:*\n%s", alert.Status)},
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Group:*\n%s", alert.CronGroup)},
 					{Type: "mrkdwn", Text: "*Monitor Status:*\n🔴 Alerting"},
+					{Type: "mrkdwn", Text: fmt.Sprintf("*Consecutive Issues:*\n%d", alert.ConsecutiveStuck)},
 				},
 			},
 			{
@@ -63,7 +63,6 @@ func formatAlertingMessage(alert CronAlert) Message {
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Scheduled At:*\n%s", scheduledAt)},
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Last Execution:*\n%s", lastExec)},
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Running Time:*\n%s", runningTime)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Consecutive Issues:*\n%d", alert.ConsecutiveStuck)},
 				},
 			},
 			{
@@ -107,7 +106,6 @@ func formatNotAlertingMessage(alert CronAlert) Message {
 				Type: "section",
 				Fields: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Job:*\n`%s`", alert.CronCode)},
-					{Type: "mrkdwn", Text: fmt.Sprintf("*Database Status:*\n%s", alert.Status)},
 					{Type: "mrkdwn", Text: fmt.Sprintf("*Cron Group:*\n%s", alert.CronGroup)},
 					{Type: "mrkdwn", Text: "*Monitor Status:*\n🟢 Not Alerting"},
 				},

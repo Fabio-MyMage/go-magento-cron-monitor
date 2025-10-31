@@ -262,18 +262,44 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 		LastExecution: transition.LastExecution,
 		StuckDuration: transition.StuckDuration,
 		Timestamp:     now,
+		
+		// Set default values from transition
+		CronGroup:        transition.CronGroup,
+		RunningTime:      transition.RunningTime,
+		ScheduledAt:      transition.ScheduledAt,
+		Reason:           transition.Reason,
+		ConsecutiveStuck: transition.ConsecutiveStuck,
+		PendingCount:     transition.PendingCount,
+		ErrorCount:       transition.ErrorCount,
+		MissedCount:      transition.MissedCount,
 	}
 	
-	// Enrich with detailed alert data if available
+	// Enrich with detailed alert data if available (overrides transition data)
 	if enrichedAlert != nil {
-		slackAlert.CronGroup = enrichedAlert.CronGroup
-		slackAlert.RunningTime = enrichedAlert.RunningTime
-		slackAlert.ScheduledAt = enrichedAlert.ScheduledAt
-		slackAlert.Reason = enrichedAlert.Reason
-		slackAlert.ConsecutiveStuck = enrichedAlert.ConsecutiveStuck
-		slackAlert.PendingCount = enrichedAlert.PendingCount
-		slackAlert.ErrorCount = enrichedAlert.ErrorCount
-		slackAlert.MissedCount = enrichedAlert.MissedCount
+		if enrichedAlert.CronGroup != "" {
+			slackAlert.CronGroup = enrichedAlert.CronGroup
+		}
+		if enrichedAlert.RunningTime != nil {
+			slackAlert.RunningTime = enrichedAlert.RunningTime
+		}
+		if enrichedAlert.ScheduledAt != nil {
+			slackAlert.ScheduledAt = enrichedAlert.ScheduledAt
+		}
+		if enrichedAlert.Reason != "" {
+			slackAlert.Reason = enrichedAlert.Reason
+		}
+		if enrichedAlert.ConsecutiveStuck > 0 {
+			slackAlert.ConsecutiveStuck = enrichedAlert.ConsecutiveStuck
+		}
+		if enrichedAlert.PendingCount > 0 {
+			slackAlert.PendingCount = enrichedAlert.PendingCount
+		}
+		if enrichedAlert.ErrorCount > 0 {
+			slackAlert.ErrorCount = enrichedAlert.ErrorCount
+		}
+		if enrichedAlert.MissedCount > 0 {
+			slackAlert.MissedCount = enrichedAlert.MissedCount
+		}
 	}
 
 	// Send notification
