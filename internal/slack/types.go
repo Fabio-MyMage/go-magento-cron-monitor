@@ -6,8 +6,8 @@ import "time"
 type AlertType string
 
 const (
-	AlertTypeStuck     AlertType = "stuck"
-	AlertTypeRecovered AlertType = "recovered"
+	AlertTypeAlerting    AlertType = "alerting"
+	AlertTypeNotAlerting AlertType = "not_alerting"
 )
 
 // CronAlert represents a cron job alert for Slack

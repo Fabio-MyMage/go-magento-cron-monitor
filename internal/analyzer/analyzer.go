@@ -33,7 +33,7 @@ type JobState struct {
 	MissedStreak     int
 	// Slack notification tracking
 	LastSlackAlert time.Time // Track last Slack notification time
-	LastKnownState string    // "healthy" or "stuck"
+	LastKnownState string    // "not_alerting" or "alerting"
 	StuckSince     time.Time // When cron became stuck
 }
 
@@ -46,10 +46,10 @@ type SchedulerState struct {
 // StateTransition represents a cron state change
 type StateTransition struct {
 	CronCode      string
-	FromState     string // "healthy" or "stuck"
-	ToState       string // "healthy" or "stuck"
+	FromState     string // "not_alerting" or "alerting"
+	ToState       string // "not_alerting" or "alerting"
 	Timestamp     time.Time
-	StuckDuration time.Duration // For stuck→healthy transitions
+	StuckDuration time.Duration // For alerting→not_alerting transitions
 	Status        string
 	LastExecution time.Time
 	
@@ -448,16 +448,16 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 		cronGroup := a.extractCronGroup(jobCode)
 		detectionCfg := a.config.GetDetectionConfig(jobCode, cronGroup)
 
-		// Determine if currently healthy or stuck
-		isHealthy := a.isJobHealthy(schedList, detectionCfg, state)
+		// Determine if currently not alerting or alerting
+		isNotAlerting := a.isJobHealthy(schedList, detectionCfg, state)
 
 		// Initialize state if empty
 		if state.LastKnownState == "" {
-			state.LastKnownState = "healthy"
+			state.LastKnownState = "not_alerting"
 		}
 
-		// Detect healthy → stuck transition
-		if !isHealthy && state.LastKnownState == "healthy" {
+		// Detect not_alerting → alerting transition
+		if !isNotAlerting && state.LastKnownState == "not_alerting" {
 			state.StuckSince = time.Now()
 
 			// Get last execution time
@@ -470,17 +470,17 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 
 			transitions = append(transitions, StateTransition{
 				CronCode:      jobCode,
-				FromState:     "healthy",
-				ToState:       "stuck",
+				FromState:     "not_alerting",
+				ToState:       "alerting",
 				Timestamp:     time.Now(),
 				Status:        state.LastStatus,
 				LastExecution: lastExec,
 			})
-			state.LastKnownState = "stuck"
+			state.LastKnownState = "alerting"
 		}
 
-		// Detect stuck → healthy transition
-		if isHealthy && state.LastKnownState == "stuck" {
+		// Detect alerting → not_alerting transition
+		if isNotAlerting && state.LastKnownState == "alerting" {
 			duration := time.Since(state.StuckSince)
 
 			// Get last execution time
@@ -493,14 +493,14 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 
 			transitions = append(transitions, StateTransition{
 				CronCode:      jobCode,
-				FromState:     "stuck",
-				ToState:       "healthy",
+				FromState:     "alerting",
+				ToState:       "not_alerting",
 				Timestamp:     time.Now(),
 				StuckDuration: duration,
-				Status:        "healthy",
+				Status:        "not_alerting",
 				LastExecution: lastExec,
 			})
-			state.LastKnownState = "healthy"
+			state.LastKnownState = "not_alerting"
 			state.StuckSince = time.Time{}
 		}
 	}

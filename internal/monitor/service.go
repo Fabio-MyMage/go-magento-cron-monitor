@@ -184,7 +184,7 @@ func (s *Service) logCheckSummary(schedules []*database.CronSchedule, alerts []*
 	if len(alerts) > 0 {
 		s.logger.Info("Check completed with alerts", fields)
 	} else {
-		s.logger.Info("Check completed - all healthy", fields)
+		s.logger.Info("Check completed - all not alerting", fields)
 	}
 
 	// Log detailed job states at debug level
@@ -225,11 +225,11 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 	var cooldown time.Duration
 	var alertType slack.AlertType
 
-	if transition.ToState == "stuck" {
-		// Cron became stuck
+	if transition.ToState == "alerting" {
+		// Cron became alerting
 		cooldown = s.config.Notifications.Slack.AlertCooldown
-		alertType = slack.AlertTypeStuck
-	} else if transition.ToState == "healthy" {
+		alertType = slack.AlertTypeAlerting
+	} else if transition.ToState == "not_alerting" {
 		// Cron recovered
 		if !s.config.Notifications.Slack.SendRecovery {
 			s.logger.Debug("Skipping recovery notification (disabled)", map[string]interface{}{
@@ -238,7 +238,7 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 			return nil
 		}
 		cooldown = s.config.Notifications.Slack.RecoveryCooldown
-		alertType = slack.AlertTypeRecovered
+		alertType = slack.AlertTypeNotAlerting
 	} else {
 		return nil
 	}
