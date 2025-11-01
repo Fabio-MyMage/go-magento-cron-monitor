@@ -12,7 +12,6 @@ import (
 // TestSlackData represents the JSON input for testing Slack alerts
 type TestSlackData struct {
 	ConsecutiveStuck int    `json:"consecutive_stuck"`
-	CronGroup        string `json:"cron_group"`
 	ExecutedAt       string `json:"executed_at"`
 	JobCode          string `json:"job_code"`
 	Reason           string `json:"reason"`
@@ -28,10 +27,10 @@ var testSlackCmd = &cobra.Command{
 
 Examples:
   # Test alerting notification
-  go-magento-cron-monitor test-slack "https://hooks.slack.com/..." '{"consecutive_stuck":6,"cron_group":"default","executed_at":"2025-10-31T09:21:21Z","job_code":"image_binder_run","reason":"job running longer than max_running_time threshold (1h0m0s)","running_time":"1h9m11.666374962s","scheduled_at":"2025-10-31T09:20:00Z","status":"running"}'
+  go-magento-cron-monitor test-slack "https://hooks.slack.com/..." '{"consecutive_stuck":6,"executed_at":"2025-10-31T09:21:21Z","job_code":"image_binder_run","reason":"job running longer than max_running_time threshold (1h0m0s)","running_time":"1h9m11.666374962s","scheduled_at":"2025-10-31T09:20:00Z","status":"running"}'
 
   # Test recovery notification
-  go-magento-cron-monitor test-slack "https://hooks.slack.com/..." '{"consecutive_stuck":0,"cron_group":"default","executed_at":"2025-10-31T09:21:21Z","job_code":"image_binder_run","reason":"Issues resolved - cron job returned to normal operation","scheduled_at":"2025-10-31T09:20:00Z","status":"success"}' --recovery`,
+  go-magento-cron-monitor test-slack "https://hooks.slack.com/..." '{"consecutive_stuck":0,"executed_at":"2025-10-31T09:21:21Z","job_code":"image_binder_run","reason":"Issues resolved - cron job returned to normal operation","scheduled_at":"2025-10-31T09:20:00Z","status":"success"}' --recovery`,
 	Args: cobra.ExactArgs(2),
 	RunE: runTestSlack,
 }
@@ -97,7 +96,6 @@ func runTestSlack(cmd *cobra.Command, args []string) error {
 		LastExecution:    executedAt,
 		StuckDuration:    stuckDuration,
 		Timestamp:        time.Now(),
-		CronGroup:        testData.CronGroup,
 		RunningTime:      runningTime,
 		ScheduledAt:      &scheduledAt,
 		Reason:           testData.Reason,

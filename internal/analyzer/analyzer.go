@@ -2,8 +2,6 @@ package analyzer
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,7 +22,6 @@ type Analyzer struct {
 // JobState tracks the state of a cron job across multiple checks
 type JobState struct {
 	JobCode          string
-	CronGroup        string
 	ConsecutiveStuck int
 	LastStatus       string
 	LastChecked      time.Time
@@ -54,7 +51,6 @@ type StateTransition struct {
 	LastExecution time.Time
 	
 	// Enhanced fields for detailed Slack alerts
-	CronGroup        string
 	RunningTime      *time.Duration
 	ScheduledAt      *time.Time
 	Reason           string
@@ -88,15 +84,13 @@ func (a *Analyzer) Analyze(schedules []*database.CronSchedule) []*logger.StuckCr
 
 	// Analyze each job
 	for jobCode, schedList := range jobSchedules {
-		cronGroup := a.extractCronGroup(jobCode)
-		detectionCfg := a.config.GetDetectionConfig(jobCode, cronGroup)
+		detectionCfg := a.config.GetDetectionConfig(jobCode)
 
 		// Get or create job state
 		state, exists := a.jobStates[jobCode]
 		if !exists {
 			state = &JobState{
-				JobCode:   jobCode,
-				CronGroup: cronGroup,
+				JobCode: jobCode,
 			}
 			a.jobStates[jobCode] = state
 		}
@@ -155,7 +149,6 @@ func (a *Analyzer) checkLongRunning(schedules []*database.CronSchedule, cfg conf
 			if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 				return &logger.StuckCronAlert{
 					JobCode:          s.JobCode,
-					CronGroup:        state.CronGroup,
 					Status:           s.Status,
 					RunningTime:      &runningTime,
 					ScheduledAt:      &s.ScheduledAt,
@@ -188,7 +181,6 @@ func (a *Analyzer) checkPendingAccumulation(schedules []*database.CronSchedule, 
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			return &logger.StuckCronAlert{
 				JobCode:          state.JobCode,
-				CronGroup:        state.CronGroup,
 				Status:           "pending",
 				PendingCount:     pendingCount,
 				Reason:           fmt.Sprintf("too many pending jobs (%d exceeds threshold of %d)", pendingCount, cfg.MaxPendingCount),
@@ -231,7 +223,6 @@ func (a *Analyzer) checkConsecutiveErrors(schedules []*database.CronSchedule, cf
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			alert := &logger.StuckCronAlert{
 				JobCode:          state.JobCode,
-				CronGroup:        state.CronGroup,
 				Status:           "error",
 				ErrorCount:       errorCount,
 				Reason:           fmt.Sprintf("consecutive errors detected (%d meets threshold of %d)", errorCount, cfg.ConsecutiveErrors),
@@ -272,7 +263,6 @@ func (a *Analyzer) checkMissedExecutions(schedules []*database.CronSchedule, cfg
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			return &logger.StuckCronAlert{
 				JobCode:          state.JobCode,
-				CronGroup:        state.CronGroup,
 				Status:           "missed",
 				MissedCount:      missedCount,
 				Reason:           fmt.Sprintf("too many missed executions (%d exceeds threshold of %d)", missedCount, cfg.MaxMissedCount),
@@ -290,40 +280,6 @@ func (a *Analyzer) checkMissedExecutions(schedules []*database.CronSchedule, cfg
 	return nil
 }
 
-// extractCronGroup extracts the cron group from job_code
-// Magento cron job codes often follow patterns like:
-// - indexer_* -> index group
-// - consumers_* -> consumers group
-// - ddg_automation_* -> ddg_automation group
-// - catalog_* -> default group
-func (a *Analyzer) extractCronGroup(jobCode string) string {
-	// Check if there's a specific group configured for this job pattern
-	for _, group := range a.config.Monitor.CronGroups {
-		// Simple prefix matching
-		if strings.HasPrefix(jobCode, group.Name+"_") {
-			return group.Name
-		}
-	}
-
-	// Try to extract group from job code pattern
-	patterns := map[*regexp.Regexp]string{
-		regexp.MustCompile(`^indexer_`):        "index",
-		regexp.MustCompile(`^consumers_`):      "consumers",
-		regexp.MustCompile(`^ddg_automation_`): "ddg_automation",
-		regexp.MustCompile(`^catalog_`):        "catalog",
-		regexp.MustCompile(`^backend_`):        "backend",
-		regexp.MustCompile(`^sales_`):          "sales",
-	}
-
-	for pattern, group := range patterns {
-		if pattern.MatchString(jobCode) {
-			return group
-		}
-	}
-
-	// Default group
-	return "default"
-}
 
 // cleanupOldStates removes job states that haven't been checked recently
 func (a *Analyzer) cleanupOldStates() {
@@ -410,7 +366,6 @@ func (a *Analyzer) CheckSchedulerHealth(dbClient *database.Client) *logger.Stuck
 	
 	return &logger.StuckCronAlert{
 		JobCode:          "SCHEDULER",
-		CronGroup:        "system",
 		Status:           "inactive",
 		Reason:           fmt.Sprintf("no jobs created in last %d minutes and no pending jobs scheduled for next %d minutes", inactivityMinutes, lookaheadMinutes),
 		ConsecutiveStuck: a.schedulerState.ConsecutiveInactive,
@@ -445,8 +400,7 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 			continue
 		}
 
-		cronGroup := a.extractCronGroup(jobCode)
-		detectionCfg := a.config.GetDetectionConfig(jobCode, cronGroup)
+		detectionCfg := a.config.GetDetectionConfig(jobCode)
 
 		// Determine if currently not alerting or alerting
 		isNotAlerting := a.isJobHealthy(schedList, detectionCfg, state)
@@ -494,7 +448,6 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 				Timestamp:        time.Now(),
 				Status:           currentStatus,
 				LastExecution:    lastExec,
-				CronGroup:        cronGroup,
 				RunningTime:      runningTime,
 				ScheduledAt:      scheduledAt,
 				Reason:           reason,
@@ -532,7 +485,6 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 				StuckDuration:    duration,
 				Status:           currentStatus,
 				LastExecution:    lastExec,
-				CronGroup:        cronGroup,
 				ScheduledAt:      scheduledAt,
 				Reason:           "", // No specific reason needed for recovery
 				ConsecutiveStuck: 0, // Reset since it's no longer alerting

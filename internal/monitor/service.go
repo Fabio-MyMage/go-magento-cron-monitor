@@ -204,7 +204,6 @@ func (s *Service) logJobStates() {
 		if state.ConsecutiveStuck > 0 || state.ErrorStreak > 0 || state.MissedStreak > 0 {
 			s.logger.Debug("Job state", map[string]interface{}{
 				"job_code":          jobCode,
-				"cron_group":        state.CronGroup,
 				"consecutive_stuck": state.ConsecutiveStuck,
 				"error_streak":      state.ErrorStreak,
 				"missed_streak":     state.MissedStreak,
@@ -264,7 +263,6 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 		Timestamp:     now,
 		
 		// Set default values from transition
-		CronGroup:        transition.CronGroup,
 		RunningTime:      transition.RunningTime,
 		ScheduledAt:      transition.ScheduledAt,
 		Reason:           transition.Reason,
@@ -276,9 +274,6 @@ func (s *Service) handleStateTransition(transition analyzer.StateTransition, now
 	
 	// Enrich with detailed alert data if available (overrides transition data)
 	if enrichedAlert != nil {
-		if enrichedAlert.CronGroup != "" {
-			slackAlert.CronGroup = enrichedAlert.CronGroup
-		}
 		if enrichedAlert.RunningTime != nil {
 			slackAlert.RunningTime = enrichedAlert.RunningTime
 		}

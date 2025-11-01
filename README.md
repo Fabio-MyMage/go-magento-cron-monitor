@@ -17,9 +17,8 @@ A Go CLI application that continuously monitors Magento 2 cron jobs by querying 
   - Recovery notifications when jobs resume normal operation
   - Configurable cooldown periods to prevent spam
   - Support for multiple webhook URLs
-- ⚙️ **Flexible Configuration** - YAML-based configuration with per-group overrides
 - 📝 **Structured Logging** - JSON or text format logging to file and stdout
-- 🎯 **Selective Monitoring** - Configure different thresholds for different cron groups
+- 🎯 **Selective Monitoring** - Configure different thresholds for different cron job_codes
 
 ## Installation
 
@@ -90,15 +89,6 @@ monitor:
     # Scheduler health detection
     scheduler_inactivity_minutes: 10
     scheduler_lookahead_minutes: 15
-  
-  # Optional: per-group overrides
-  cron_groups:
-    - name: "index"
-      max_running_time: 60m
-      max_pending_count: 10
-      
-    - name: "consumers"
-      max_running_time: 15m
 
   # Optional: per-job overrides
   job_overrides:
@@ -143,7 +133,6 @@ notifications:
 - `detection.lookback_window` - Time range to query from `cron_schedule` table
 - `detection.scheduler_inactivity_minutes` - Alert if no jobs created in this timeframe (default: 10)
 - `detection.scheduler_lookahead_minutes` - AND no pending jobs scheduled in next X minutes (default: 15)
-- `cron_groups` - Per-group overrides (auto-detected from job_code patterns)
 - `job_overrides` - Per-job overrides for specific job codes
 
 #### Configuration Priority
@@ -151,10 +140,9 @@ notifications:
 The monitor applies thresholds in the following priority order (highest to lowest):
 
 1. **Job-specific overrides** (`job_overrides`) - Exact job_code match
-2. **Cron group overrides** (`cron_groups`) - Pattern-based group matching
 3. **Global defaults** (`detection`) - Base configuration
 
-Example: If `indexer_reindex_all_invalid` has a job override with `max_running_time: 180m`, it will use that instead of the "index" group's `60m` or the global default `30m`.
+Example: If `indexer_reindex_all_invalid` has a job override with `max_running_time: 180m`, it will use that instead of the the global default `30m`.
 
 #### Logging Settings
 
@@ -210,7 +198,6 @@ This dual-check approach prevents false positives during normal periods of low c
   "level": "ERROR",
   "message": "STUCK CRON SCHEDULER",
   "job_code": "SCHEDULER",
-  "group": "system",
   "reason": "No jobs created in 10 minutes and no pending jobs scheduled for next 15 minutes"
 }
 ```

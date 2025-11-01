@@ -20,7 +20,6 @@ type CronAlert struct {
 	Timestamp     time.Time
 	
 	// Enhanced fields for detailed alerts
-	CronGroup        string
 	RunningTime      *time.Duration
 	ScheduledAt      *time.Time
 	Reason           string

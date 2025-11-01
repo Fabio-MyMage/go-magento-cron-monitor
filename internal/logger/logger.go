@@ -213,7 +213,6 @@ func (l *Logger) Error(msg string, err error, fields map[string]interface{}) {
 func (l *Logger) LogStuckCron(alert *StuckCronAlert) {
 	fields := map[string]interface{}{
 		"job_code":          alert.JobCode,
-		"cron_group":        alert.CronGroup,
 		"status":            alert.Status,
 		"reason":            alert.Reason,
 		"consecutive_stuck": alert.ConsecutiveStuck,
@@ -253,7 +252,6 @@ func (l *Logger) LogStuckCron(alert *StuckCronAlert) {
 // StuckCronAlert represents a stuck cron alert
 type StuckCronAlert struct {
 	JobCode          string
-	CronGroup        string
 	Status           string
 	RunningTime      *time.Duration
 	ScheduledAt      *time.Time
