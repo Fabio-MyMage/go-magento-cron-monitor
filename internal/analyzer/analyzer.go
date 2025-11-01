@@ -484,6 +484,9 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 				}
 			}
 
+			// Get the actual reason from the alert detection methods
+			reason := a.getActualAlertReason(schedList, detectionCfg, state)
+
 			transitions = append(transitions, StateTransition{
 				CronCode:         jobCode,
 				FromState:        "not_alerting",
@@ -494,7 +497,7 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 				CronGroup:        cronGroup,
 				RunningTime:      runningTime,
 				ScheduledAt:      scheduledAt,
-				Reason:           "Analysis detected issues - check problem details in alert",
+				Reason:           reason,
 				ConsecutiveStuck: state.ConsecutiveStuck,
 			})
 			state.LastKnownState = "alerting"
@@ -531,7 +534,7 @@ func (a *Analyzer) DetectStateTransitions(schedules []*database.CronSchedule) []
 				LastExecution:    lastExec,
 				CronGroup:        cronGroup,
 				ScheduledAt:      scheduledAt,
-				Reason:           "Issues resolved - cron job returned to normal operation",
+				Reason:           "", // No specific reason needed for recovery
 				ConsecutiveStuck: 0, // Reset since it's no longer alerting
 			})
 			state.LastKnownState = "not_alerting"
@@ -558,4 +561,24 @@ func (a *Analyzer) isJobHealthy(schedules []*database.CronSchedule, cfg config.D
 		return false
 	}
 	return true
+}
+
+// getActualAlertReason determines the specific reason for an alert by checking which condition is triggered
+func (a *Analyzer) getActualAlertReason(schedules []*database.CronSchedule, cfg config.DetectionConfig, state *JobState) string {
+	// Check each condition and return the specific reason
+	if alert := a.checkLongRunning(schedules, cfg, state); alert != nil {
+		return alert.Reason
+	}
+	if alert := a.checkPendingAccumulation(schedules, cfg, state); alert != nil {
+		return alert.Reason
+	}
+	if alert := a.checkConsecutiveErrors(schedules, cfg, state); alert != nil {
+		return alert.Reason
+	}
+	if alert := a.checkMissedExecutions(schedules, cfg, state); alert != nil {
+		return alert.Reason
+	}
+	
+	// Fallback if no specific condition is met
+	return "Multiple issues detected requiring attention"
 }
