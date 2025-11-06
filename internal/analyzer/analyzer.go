@@ -177,6 +177,7 @@ func (a *Analyzer) checkPendingAccumulation(schedules []*database.CronSchedule, 
 
 	if pendingCount > cfg.MaxPendingCount {
 		state.ConsecutiveStuck++
+		state.LastStatus = "pending_accumulation"
 
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			return &logger.StuckCronAlert{
@@ -193,6 +194,7 @@ func (a *Analyzer) checkPendingAccumulation(schedules []*database.CronSchedule, 
 	// Reset if under threshold
 	if state.LastStatus == "pending_accumulation" {
 		state.ConsecutiveStuck = 0
+		state.LastStatus = ""
 	}
 	return nil
 }
@@ -219,6 +221,7 @@ func (a *Analyzer) checkConsecutiveErrors(schedules []*database.CronSchedule, cf
 	if errorCount >= cfg.ConsecutiveErrors {
 		state.ErrorStreak = errorCount
 		state.ConsecutiveStuck++
+		state.LastStatus = "consecutive_errors"
 
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			alert := &logger.StuckCronAlert{
@@ -243,6 +246,7 @@ func (a *Analyzer) checkConsecutiveErrors(schedules []*database.CronSchedule, cf
 	state.ErrorStreak = 0
 	if state.LastStatus == "consecutive_errors" {
 		state.ConsecutiveStuck = 0
+		state.LastStatus = ""
 	}
 	return nil
 }
@@ -259,6 +263,7 @@ func (a *Analyzer) checkMissedExecutions(schedules []*database.CronSchedule, cfg
 	if missedCount >= cfg.MaxMissedCount {
 		state.MissedStreak = missedCount
 		state.ConsecutiveStuck++
+		state.LastStatus = "missed_executions"
 
 		if state.ConsecutiveStuck >= cfg.ThresholdChecks {
 			return &logger.StuckCronAlert{
@@ -276,6 +281,7 @@ func (a *Analyzer) checkMissedExecutions(schedules []*database.CronSchedule, cfg
 	state.MissedStreak = 0
 	if state.LastStatus == "missed_executions" {
 		state.ConsecutiveStuck = 0
+		state.LastStatus = ""
 	}
 	return nil
 }
