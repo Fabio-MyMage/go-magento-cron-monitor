@@ -116,13 +116,6 @@ func formatNotAlertingMessage(alert CronAlert) Message {
 				},
 			},
 			{
-				Type: "section",
-				Text: &TextObject{
-					Type: "mrkdwn",
-					Text: fmt.Sprintf("*📝 Resolution Details:*\n• Original Issue: %s", alert.Reason),
-				},
-			},
-			{
 				Type: "context",
 				Elements: []TextObject{
 					{Type: "mrkdwn", Text: fmt.Sprintf("🕒 No longer alerting at %s", timestamp)},
